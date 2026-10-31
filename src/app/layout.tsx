@@ -1,0 +1,29 @@
+import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import AppShell from "@/components/AppShell";
+import { Colors } from "@/utils/Colors";
+import { themeCss } from "@/utils/Theme";
+import "./globals.css";
+
+const sans = Plus_Jakarta_Sans({ variable: "--font-sans", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
+const mono = JetBrains_Mono({ variable: "--font-mono", subsets: ["latin"], weight: ["500", "600"] });
+
+export const metadata: Metadata = {
+  title: "StockLink Inventory",
+  description: "Purchase, QC, stock, transit and billing across India and UAE stores.",
+};
+
+export const viewport: Viewport = { themeColor: Colors.sidebar };
+
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  return (
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+      <head>
+        <style dangerouslySetInnerHTML={{ __html: themeCss }} />
+      </head>
+      <body>
+        <AppShell>{children}</AppShell>
+      </body>
+    </html>
+  );
+}
