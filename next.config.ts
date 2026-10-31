@@ -1,12 +1,12 @@
 import type { NextConfig } from "next";
+import { BACKEND_URL } from "./src/constants/ApiConstants";
 
 const nextConfig: NextConfig = {
   /* config options here */
   cacheComponents: true,
   // Proxy /api/* to the HTTP backend so the HTTPS site never makes a mixed-content request.
   async rewrites() {
-    const backend = process.env.API_BACKEND_URL ?? "http://3.107.18.59:4005";
-    return [{ source: "/api/:path*", destination: `${backend}/api/:path*` }];
+    return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*` }];
   },
   partialPrefetching: true,
   turbopack: {
