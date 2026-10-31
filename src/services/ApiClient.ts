@@ -17,7 +17,8 @@ const humanize = (msg: string) =>
 const AUTH_MESSAGES = ["Invalid token", "Token expired", "Unauthorized. Please login"];
 
 const buildUrl = (path: string, query?: Query) => {
-  const url = new URL(BASE_URL + path);
+  // BASE_URL is relative ("/api"), so resolve it against the current origin
+  const url = new URL(BASE_URL + path, typeof window === "undefined" ? "http://localhost" : window.location.origin);
   Object.entries(query ?? {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, String(v));
   });

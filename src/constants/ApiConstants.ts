@@ -1,8 +1,9 @@
 /**
  * Backend (inventory-node-backend) base URL and every REST endpoint the app calls.
- * Override the base URL with NEXT_PUBLIC_API_BASE_URL in `.env.local`.
+ * `/api` is proxied to the backend by the rewrite in `next.config.ts`
+ * (target set by API_BACKEND_URL), which keeps requests same-origin over HTTPS.
  */
-export const BASE_URL = "http://3.107.18.59:4005/api";
+export const BASE_URL = "/api";
 
 /** Backend caps `limit` at 100 per page. */
 export const MAX_PAGE_LIMIT = 100;
