@@ -25,6 +25,7 @@ export default function StoresScreen() {
   const { toast } = useUI();
   const { busy, run } = useSubmit();
   const q = useApi(() => Promise.all([getAllStores(), getAllStaff()]));
+  const [creating, setCreating] = useState(false);
   const [f, setF] = useState(EMPTY);
   const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
 
@@ -38,6 +39,7 @@ export default function StoresScreen() {
     run(async () => {
       await createStore({ name: t.name, location: t.loc as StoreLocation, contactNumber: t.contact, inCharge: t.inch });
       setF(EMPTY);
+      setCreating(false);
       toast("Store created");
       q.reload();
     });
@@ -45,32 +47,48 @@ export default function StoresScreen() {
 
   return (
     <>
-      <PageHeader eyebrow="Masters" title="Stores" subtitle="Create stores in India or UAE" />
-      <Card title="Create store" icon="plus">
-        <div className="grid">
-          <Field label="Store name">
-            <Input value={f.name} onChange={set("name")} placeholder="e.g. TRP_EXPORT STORE" />
-          </Field>
-          <Field label="Store location">
-            <Select value={f.loc} onChange={set("loc")} options={[{ value: "", label: "Select…" }, "IND", "UAE"]} />
-          </Field>
-          <Field label="Contact no">
-            <Input value={f.contact} onChange={set("contact")} inputMode="tel" />
-          </Field>
-          <Field label="In charge (Biller / Purchaser)">
-            <Select
-              value={f.inch}
-              onChange={set("inch")}
-              options={[{ value: "", label: "Select…" }, ...inCharge.map((s) => ({ value: s._id, label: `${s.staffName} — ${s.employeeType}` }))]}
-            />
-          </Field>
-        </div>
-        <div className="actions">
-          <Button icon="check" onClick={save} disabled={busy}>
-            Create store
-          </Button>
-        </div>
-      </Card>
+      <PageHeader
+        eyebrow="Masters"
+        title="Stores"
+        subtitle="Create stores in India or UAE"
+        actions={
+          !creating && (
+            <Button icon="plus" onClick={() => setCreating(true)}>
+              Create store
+            </Button>
+          )
+        }
+      />
+      {creating && (
+        <Card title="Create store" icon="plus">
+          <div className="grid">
+            <Field label="Store name">
+              <Input value={f.name} onChange={set("name")} placeholder="e.g. TRP_EXPORT STORE" />
+            </Field>
+            <Field label="Store location">
+              <Select value={f.loc} onChange={set("loc")} options={[{ value: "", label: "Select…" }, "IND", "UAE"]} />
+            </Field>
+            <Field label="Contact no">
+              <Input value={f.contact} onChange={set("contact")} inputMode="tel" />
+            </Field>
+            <Field label="In charge (Biller / Purchaser)">
+              <Select
+                value={f.inch}
+                onChange={set("inch")}
+                options={[{ value: "", label: "Select…" }, ...inCharge.map((s) => ({ value: s._id, label: `${s.staffName} — ${s.employeeType}` }))]}
+              />
+            </Field>
+          </div>
+          <div className="actions">
+            <Button icon="check" onClick={save} disabled={busy}>
+              Save
+            </Button>
+            <Button variant="ghost" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card title="Stores" icon="store">
         <DataTable

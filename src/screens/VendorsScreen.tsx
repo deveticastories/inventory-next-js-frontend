@@ -22,6 +22,7 @@ export default function VendorsScreen() {
   const { toast } = useUI();
   const { busy, run } = useSubmit();
   const q = useApi(getAllVendors);
+  const [creating, setCreating] = useState(false);
   const [f, setF] = useState(EMPTY);
   const [detail, setDetail] = useState<string | null>(null);
   const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
@@ -36,6 +37,7 @@ export default function VendorsScreen() {
     run(async () => {
       await createVendor({ vendorName: v.name, contactNo: v.contact, bankName: v.bank, accountNo: v.acc, ifsc: v.ifsc });
       setF(EMPTY);
+      setCreating(false);
       toast("Vendor saved");
       q.reload();
     });
@@ -43,31 +45,47 @@ export default function VendorsScreen() {
 
   return (
     <>
-      <PageHeader eyebrow="Masters" title="Vendors" subtitle="Vendor master with outstanding balances" />
-      <Card title="Add vendor" icon="plus">
-        <div className="grid">
-          <Field label="Vendor name">
-            <Input value={f.name} onChange={set("name")} />
-          </Field>
-          <Field label="Contact no">
-            <Input value={f.contact} onChange={set("contact")} inputMode="tel" />
-          </Field>
-          <Field label="Bank name">
-            <Input value={f.bank} onChange={set("bank")} />
-          </Field>
-          <Field label="Account no">
-            <Input value={f.acc} onChange={set("acc")} />
-          </Field>
-          <Field label="IFSC">
-            <Input value={f.ifsc} onChange={set("ifsc")} />
-          </Field>
-        </div>
-        <div className="actions">
-          <Button icon="check" onClick={save} disabled={busy}>
-            Save vendor
-          </Button>
-        </div>
-      </Card>
+      <PageHeader
+        eyebrow="Masters"
+        title="Vendors"
+        subtitle="Vendor master with outstanding balances"
+        actions={
+          !creating && (
+            <Button icon="plus" onClick={() => setCreating(true)}>
+              Add vendor
+            </Button>
+          )
+        }
+      />
+      {creating && (
+        <Card title="Add vendor" icon="plus">
+          <div className="grid">
+            <Field label="Vendor name">
+              <Input value={f.name} onChange={set("name")} />
+            </Field>
+            <Field label="Contact no">
+              <Input value={f.contact} onChange={set("contact")} inputMode="tel" />
+            </Field>
+            <Field label="Bank name">
+              <Input value={f.bank} onChange={set("bank")} />
+            </Field>
+            <Field label="Account no">
+              <Input value={f.acc} onChange={set("acc")} />
+            </Field>
+            <Field label="IFSC">
+              <Input value={f.ifsc} onChange={set("ifsc")} />
+            </Field>
+          </div>
+          <div className="actions">
+            <Button icon="check" onClick={save} disabled={busy}>
+              Save vendor
+            </Button>
+            <Button variant="ghost" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card title="Vendor list" icon="truck">
         <DataTable

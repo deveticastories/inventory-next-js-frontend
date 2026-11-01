@@ -23,6 +23,7 @@ export default function StaffScreen() {
   const { busy, run } = useSubmit();
   const me = useSession()?.user;
   const q = useApi(getAllStaff);
+  const [creating, setCreating] = useState(false);
   const [f, setF] = useState(EMPTY);
   const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
 
@@ -43,6 +44,7 @@ export default function StaffScreen() {
         employeeType: s.type as StaffType,
       });
       setF(EMPTY);
+      setCreating(false);
       toast("Staff created");
       q.reload();
     });
@@ -63,34 +65,50 @@ export default function StaffScreen() {
 
   return (
     <>
-      <PageHeader eyebrow="Masters" title="Staff" subtitle="Create and manage staff logins" />
-      <Card title="Create staff" icon="plus">
-        <div className="grid">
-          <Field label="Staff name">
-            <Input value={f.name} onChange={set("name")} placeholder="Full name" />
-          </Field>
-          <Field label="Staff mobile no">
-            <Input value={f.mobile} onChange={set("mobile")} inputMode="tel" placeholder="10-digit mobile" />
-          </Field>
-          <Field label="Employee ID">
-            <Input value={f.emp} onChange={set("emp")} placeholder="EMP004" />
-          </Field>
-          <Field label="Email / Username">
-            <Input value={f.user} onChange={set("user")} type="email" placeholder="name@stocklink.in" />
-          </Field>
-          <Field label="Password">
-            <PasswordInput value={f.pass} onChange={set("pass")} />
-          </Field>
-          <Field label="Employee type">
-            <Select value={f.type} onChange={set("type")} options={[{ value: "", label: "Select…" }, "Admin", "Biller", "Purchaser"]} />
-          </Field>
-        </div>
-        <div className="actions">
-          <Button icon="check" onClick={save} disabled={busy}>
-            Create staff
-          </Button>
-        </div>
-      </Card>
+      <PageHeader
+        eyebrow="Masters"
+        title="Staff"
+        subtitle="Create and manage staff logins"
+        actions={
+          !creating && (
+            <Button icon="plus" onClick={() => setCreating(true)}>
+              Create staff
+            </Button>
+          )
+        }
+      />
+      {creating && (
+        <Card title="Create staff" icon="plus">
+          <div className="grid">
+            <Field label="Staff name">
+              <Input value={f.name} onChange={set("name")} placeholder="Full name" />
+            </Field>
+            <Field label="Staff mobile no">
+              <Input value={f.mobile} onChange={set("mobile")} inputMode="tel" placeholder="10-digit mobile" />
+            </Field>
+            <Field label="Employee ID">
+              <Input value={f.emp} onChange={set("emp")} placeholder="EMP004" />
+            </Field>
+            <Field label="Email / Username">
+              <Input value={f.user} onChange={set("user")} type="email" placeholder="name@stocklink.in" />
+            </Field>
+            <Field label="Password">
+              <PasswordInput value={f.pass} onChange={set("pass")} />
+            </Field>
+            <Field label="Employee type">
+              <Select value={f.type} onChange={set("type")} options={[{ value: "", label: "Select…" }, "Admin", "Biller", "Purchaser"]} />
+            </Field>
+          </div>
+          <div className="actions">
+            <Button icon="check" onClick={save} disabled={busy}>
+              Save
+            </Button>
+            <Button variant="ghost" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card title="All staff" icon="users">
         <DataTable

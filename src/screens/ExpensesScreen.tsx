@@ -20,6 +20,7 @@ export default function ExpensesScreen() {
   const { toast } = useUI();
   const { busy, run } = useSubmit();
   const q = useApi(getAllExpenses);
+  const [creating, setCreating] = useState(false);
   const [f, setF] = useState({ date: today(), type: "", mode: "Cash" as PayMode, amount: "", desc: "" });
 
   if (!q.data) return <LoadState error={q.error} onRetry={q.reload} />;
@@ -31,6 +32,7 @@ export default function ExpensesScreen() {
     run(async () => {
       await createExpense({ date: f.date, expenseType: f.type.trim(), paymentType: f.mode, amount, description: f.desc.trim() });
       setF({ ...f, type: "", amount: "", desc: "" });
+      setCreating(false);
       toast("Expense saved");
       q.reload();
     });
@@ -42,36 +44,52 @@ export default function ExpensesScreen() {
 
   return (
     <>
-      <PageHeader eyebrow="Finance" title="Daily Expenses" subtitle="Record day-to-day expenses (attach them to packing lists later)" />
+      <PageHeader
+        eyebrow="Finance"
+        title="Daily Expenses"
+        subtitle="Record day-to-day expenses (attach them to packing lists later)"
+        actions={
+          !creating && (
+            <Button icon="plus" onClick={() => setCreating(true)}>
+              New expense
+            </Button>
+          )
+        }
+      />
       <StatGrid>
         <StatCard label="Total booked" value={total} format={inr} icon="wallet" tone="primary" />
         <StatCard label="Open (not attached)" value={sum(open, (e) => e.amount)} format={inr} icon="clock" tone="warning" hint={`${open.length} entries`} />
         <StatCard label="Attached to packing" value={total - sum(open, (e) => e.amount)} format={inr} icon="package" tone="success" />
       </StatGrid>
-      <Card title="New expense" icon="plus">
-        <div className="grid">
-          <Field label="Date">
-            <Input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
-          </Field>
-          <Field label="Expense type">
-            <Input value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })} placeholder="Freight, Labour…" />
-          </Field>
-          <Field label="Payment mode">
-            <Select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as PayMode })} options={["Cash", "Upi", "Account"]} />
-          </Field>
-          <Field label="Amount (₹)">
-            <Input type="number" min={0} step="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
-          </Field>
-          <Field label="Description">
-            <Input value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} onKeyDown={(e) => e.key === "Enter" && save()} />
-          </Field>
-        </div>
-        <div className="actions">
-          <Button icon="check" onClick={save} disabled={busy}>
-            OK
-          </Button>
-        </div>
-      </Card>
+      {creating && (
+        <Card title="New expense" icon="plus">
+          <div className="grid">
+            <Field label="Date">
+              <Input type="date" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
+            </Field>
+            <Field label="Expense type">
+              <Input value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })} placeholder="Freight, Labour…" />
+            </Field>
+            <Field label="Payment mode">
+              <Select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value as PayMode })} options={["Cash", "Upi", "Account"]} />
+            </Field>
+            <Field label="Amount (₹)">
+              <Input type="number" min={0} step="0.01" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
+            </Field>
+            <Field label="Description">
+              <Input value={f.desc} onChange={(e) => setF({ ...f, desc: e.target.value })} onKeyDown={(e) => e.key === "Enter" && save()} />
+            </Field>
+          </div>
+          <div className="actions">
+            <Button icon="check" onClick={save} disabled={busy}>
+              OK
+            </Button>
+            <Button variant="ghost" onClick={() => setCreating(false)}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
       <Card title="Expenses" icon="wallet">
         <DataTable
           head={["Date", "Type", "Mode", "Amount", "Description", "Packing ID"]}
