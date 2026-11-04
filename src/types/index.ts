@@ -340,7 +340,13 @@ export interface Billing {
   netAmount: number;
   receivedAmount: number;
   balanceAmount: number;
+  isPaid?: boolean;
+  paidStatus?: BillingPaidStatus;
+  /** Paid at billing time (separate from receipt entries). */
+  paidAmount?: number;
 }
+
+export type BillingPaidStatus = "Fully Paid" | "Partial Paid";
 
 /* ---------- payments / receipts ---------- */
 export interface PaymentEntry {

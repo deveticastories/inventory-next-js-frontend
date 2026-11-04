@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/Icon";
+import type { StaffType } from "@/types";
 
 export interface NavItem {
   href: string;
@@ -9,6 +10,8 @@ export interface NavItem {
 export interface NavGroup {
   title: string;
   items: NavItem[];
+  /** Staff types that don't see this group in the sidebar. */
+  hideFor?: StaffType[];
 }
 
 export const NAV: NavGroup[] = [
@@ -18,7 +21,6 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/staff", label: "Staff", icon: "users" },
       { href: "/vendors", label: "Vendors", icon: "truck" },
-      { href: "/stores", label: "Stores", icon: "store" },
       { href: "/customers", label: "Customer Master", icon: "contact" },
     ],
   },
@@ -32,6 +34,7 @@ export const NAV: NavGroup[] = [
   },
   {
     title: "India",
+    hideFor: ["Biller"],
     items: [
       { href: "/ind-store", label: "IND Store Stock", icon: "box" },
       { href: "/packing", label: "Packing List", icon: "package" },
@@ -40,6 +43,7 @@ export const NAV: NavGroup[] = [
   },
   {
     title: "UAE",
+    hideFor: ["Purchaser"],
     items: [
       { href: "/uae-store", label: "UAE Store Stock", icon: "warehouse" },
       { href: "/billing", label: "Billing", icon: "receipt" },

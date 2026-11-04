@@ -2,12 +2,22 @@ const esc = (s: unknown) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 /**
- * Opens a print-ready window (Save as PDF from the print dialog).
- * Returns false when the browser blocked the pop-up.
+ * Prints from a hidden iframe on the current page (Save as PDF from the print dialog).
+ * A pop-up would share this tab's thread, so its open print dialog froze the app
+ * whenever the user switched back to it. Returns false if the frame couldn't be created.
  */
 export function printDoc(title: string, head: string[], rows: (string | number)[][], extraHtml = ""): boolean {
-  const w = window.open("", "_blank");
-  if (!w) return false;
+  document.querySelector("iframe[data-print]")?.remove();
+  const frame = document.createElement("iframe");
+  frame.dataset.print = "";
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:fixed;width:0;height:0;border:0;right:0;bottom:0;visibility:hidden";
+  document.body.appendChild(frame);
+  const w = frame.contentWindow;
+  if (!w) {
+    frame.remove();
+    return false;
+  }
   w.document.write(`<html><head><title>${esc(title)}</title><style>
     body{font-family:Arial,sans-serif;padding:26px;color:#111}
     h2{margin:0 0 4px;color:#4F46E5}
@@ -19,8 +29,21 @@ export function printDoc(title: string, head: string[], rows: (string | number)[
   <div class="m">Generated ${esc(new Date().toLocaleString())}</div>${extraHtml}
   <table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
   <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>
-  <script>onload=()=>print()<\/script></body></html>`);
+</body></html>`);
   w.document.close();
+  // Chrome names the saved PDF after the top page, so borrow the invoice title while printing.
+  const pageTitle = document.title;
+  const done = () => {
+    document.title = pageTitle;
+    frame.remove();
+  };
+  w.addEventListener("afterprint", () => setTimeout(done, 0));
+  document.title = title;
+  // Defer so React can commit the current update (e.g. closing the form) before the dialog opens.
+  setTimeout(() => {
+    w.focus();
+    w.print();
+  }, 50);
   return true;
 }
 

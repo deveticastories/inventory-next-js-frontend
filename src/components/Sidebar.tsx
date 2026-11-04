@@ -26,7 +26,7 @@ export default function Sidebar({ open, onNavigate }: { open: boolean; onNavigat
       </div>
 
       <nav className="nav">
-        {NAV.map((g) => (
+        {NAV.filter((g) => !(user && g.hideFor?.includes(user.employeeType))).map((g) => (
           <div key={g.title} className="nav-group">
             <div className="nav-title">{g.title}</div>
             {g.items.map((i) => {

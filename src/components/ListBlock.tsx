@@ -39,7 +39,7 @@ export default function ListBlock<S extends string>({
 
   const pdf = () => {
     const { head: h, rows: r } = tableToText(ref.current);
-    if (!printDoc(title, h, r)) toast("Allow pop-ups to download / print", "error");
+    if (!printDoc(title, h, r)) toast("Couldn't open the print dialog", "error");
   };
 
   return (

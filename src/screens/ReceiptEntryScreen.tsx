@@ -123,7 +123,7 @@ function ReceiptForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
       ["Date", "Invoice", "Customer", "Receivable", "Received", "Balance"],
       [[fmtDate(last.date), last.inv, last.cust, aed(last.recv), aed(last.recd), aed(last.balance)]],
     );
-    if (!ok) toast("Allow pop-ups to download / print", "error");
+    if (!ok) toast("Couldn't open the print dialog", "error");
   };
 
   return (

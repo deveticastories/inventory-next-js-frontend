@@ -128,7 +128,7 @@ function PaymentForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
       ["Date", "Invoice", "Vendor", "Payable", "Paid", "Balance"],
       [[fmtDate(last.date), last.inv, last.vendor, inr(last.payable), inr(last.paid), inr(last.balance)]],
     );
-    if (!ok) toast("Allow pop-ups to download / print", "error");
+    if (!ok) toast("Couldn't open the print dialog", "error");
   };
 
   return (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Badge from "@/components/Badge";
 import Button from "@/components/Button";
 import Card from "@/components/Card";
 import Combo from "@/components/Combo";
@@ -11,7 +12,8 @@ import PageHeader from "@/components/PageHeader";
 import { useUI } from "@/components/UIProvider";
 import { useApi } from "@/hooks/useApi";
 import { useSubmit } from "@/hooks/useSubmit";
-import { createBilling, getAllBillings } from "@/services/BillingServices";
+import { errorMessage } from "@/services/ApiClient";
+import { createBilling, getAllBillings, updateBillingPayment } from "@/services/BillingServices";
 import { getAllCustomers } from "@/services/CustomerServices";
 import { getUaeMainStock } from "@/services/UaeStoreServices";
 import type { Billing, Customer } from "@/types";
@@ -21,13 +23,33 @@ import { esc, printDoc } from "@/utils/Print";
 
 type Line = { stockId: string; style: string; product: string; qty: number; price: number };
 
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/** Payment recorded at billing time; receipt entries are tracked separately. */
+const payStatus = (b: Billing) => (!b.paidAmount ? "Unpaid" : b.isPaid ? "Paid" : "Partial");
+const STATUS_TONE = { Paid: "ok", Partial: "warn", Unpaid: "neutral" } as const;
+
+/** Inline error for the Amount paid field, or "" when valid. */
+const amountError = (raw: string, total: number) => {
+  const v = raw.trim();
+  if (!v) return "Enter the amount paid.";
+  if (!/^-?\d*\.?\d+$/.test(v) || /\.\d{3,}$/.test(v)) return "Enter a valid amount, e.g. 1000.00.";
+  const n = Number(v);
+  if (n < 0) return "Amount cannot be less than 0.";
+  if (n === 0) return "Amount must be greater than 0. Uncheck Paid if nothing was received.";
+  if (round2(n) > round2(total)) return `Amount cannot exceed the invoice total (${aed(total)}).`;
+  return "";
+};
+
 const printBill = (b: Billing, customers: Customer[]) => {
   const c = typeof b.customer === "object" && b.customer ? b.customer : customers.find((x) => x._id === b.customer);
   return printDoc(
     `Invoice ${b.invoiceNo}`,
     ["Style no", "Product", "Qty", "Unit price", "Amount"],
     b.products.map((l) => [l.styleNo, l.productName, l.qty, aed(l.unitPrice), aed(l.amount)]),
-    `<p class="m">Customer: <b>${esc(c?.name)}</b> · ${esc(c?.contactNo)} · Date: ${esc(fmtDate(b.date))}</p><p><b>Total: ${esc(aed(b.invoiceTotal))}</b></p>`,
+    `<p class="m">Customer: <b>${esc(c?.name)}</b> · ${esc(c?.contactNo)} · Date: ${esc(fmtDate(b.date))}</p>` +
+      `<p><b>Total: ${esc(aed(b.invoiceTotal))}</b><br>Amount paid: ${esc(aed(b.paidAmount ?? 0))}<br>` +
+      `<b>Balance due: ${esc(aed(b.balanceAmount))}</b> · ${esc(payStatus(b))}</p>`,
   );
 };
 
@@ -38,7 +60,7 @@ export default function BillingScreen() {
 
   if (!q.data) return <LoadState error={q.error} onRetry={q.reload} />;
   const [bills, customers] = q.data;
-  const print = (b: Billing) => !printBill(b, customers) && toast("Allow pop-ups to download / print", "error");
+  const print = (b: Billing) => !printBill(b, customers) && toast("Couldn't open the print dialog", "error");
 
   return (
     <>
@@ -68,7 +90,7 @@ export default function BillingScreen() {
       )}
       <Card title="Invoices" icon="receipt">
         <DataTable
-          head={["Invoice no", "Date", "Customer", "Amount", "Returns", "Net", "Received", "Balance", ""]}
+          head={["Invoice no", "Date", "Customer", "Amount", "Returns", "Net", "Paid", "Received", "Balance", "Status", ""]}
           empty="No invoices yet"
           rowKeys={bills.map((b) => b._id)}
           rows={bills.map((b) => [
@@ -78,8 +100,12 @@ export default function BillingScreen() {
             aed(b.invoiceTotal),
             aed(b.returnAmount),
             aed(b.netAmount),
+            aed(b.paidAmount ?? 0),
             aed(b.receivedAmount),
             <span key="bal" className={`amount ${b.balanceAmount > BAL_EPS ? "bad" : "ok"}`}>{aed(b.balanceAmount)}</span>,
+            <Badge key="st" tone={STATUS_TONE[payStatus(b)]}>
+              {payStatus(b)}
+            </Badge>,
             <Button key="p" variant="ghost" size="sm" icon="print" onClick={() => print(b)}>
               Print
             </Button>,
@@ -110,9 +136,15 @@ function BillForm({
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
+  const [paid, setPaid] = useState(false);
+  const [paidAmt, setPaidAmt] = useState("");
 
   if (!stockQ.data) return <LoadState error={stockQ.error} onRetry={stockQ.reload} />;
   const stock = stockQ.data.data;
+
+  const total = round2(sum(lines, (l) => l.qty * l.price));
+  const payErr = paid ? amountError(paidAmt, total) : "";
+  const full = paid && !payErr && round2(num(paidAmt)) === total;
 
   const u = stock.find((x) => x._id === sty);
   const avail = u ? u.qty - sum(lines.filter((l) => l.stockId === u._id), (l) => l.qty) : null;
@@ -129,12 +161,27 @@ function BillForm({
   const generate = () => {
     if (!cust) return toast("Select a customer", "error");
     if (!lines.length) return toast("Add at least one item", "error");
+    if (payErr) return toast(payErr, "error");
     run(async () => {
-      const inv = await createBilling({
+      let inv = await createBilling({
         date,
         customer: cust,
         products: lines.map((l) => ({ uaeMainStock: l.stockId, qty: l.qty, unitPrice: l.price })),
       });
+      if (paid) {
+        // Compare against the server's total so the status matches its balance check.
+        const amt = round2(num(paidAmt));
+        try {
+          inv = await updateBillingPayment(inv._id, {
+            paidAmount: amt,
+            paidStatus: amt >= round2(inv.balanceAmount) ? "Fully Paid" : "Partial Paid",
+          });
+        } catch (e) {
+          // The invoice exists either way — keep it and tell the cashier the payment didn't record.
+          toast(`${inv.invoiceNo} saved as Unpaid — payment not recorded: ${errorMessage(e)}`, "error");
+          return onCreated(inv);
+        }
+      }
       toast(`${inv.invoiceNo} generated`);
       onCreated(inv);
     });
@@ -195,9 +242,42 @@ function BillForm({
           ])}
         />
       </div>
-      <Totals items={[["Total qty", sum(lines, (l) => l.qty)], ["Invoice total", aed(sum(lines, (l) => l.qty * l.price))]]} />
+      <Totals items={[["Total qty", sum(lines, (l) => l.qty)], ["Invoice total", aed(total)]]} />
+      <div className="pay-row">
+        <label className="pay-check">
+          <input
+            type="checkbox"
+            checked={paid}
+            onChange={(e) => {
+              setPaid(e.target.checked);
+              setPaidAmt(e.target.checked ? total.toFixed(2) : "");
+            }}
+          />
+          Paid
+        </label>
+        {paid && (
+          <>
+            <div className="field pay-field">
+              <label>Amount paid</label>
+              <div className={`pay-input ${payErr ? "pay-input-error" : ""}`}>
+                <span>AED</span>
+                <Input autoFocus inputMode="decimal" value={paidAmt} onChange={(e) => setPaidAmt(e.target.value)} aria-invalid={!!payErr} />
+              </div>
+              {payErr && <small className="pay-error">{payErr}</small>}
+            </div>
+            {!payErr && (
+              <div className="pay-status">
+                <Badge tone={full ? "ok" : "warn"}>{full ? "Paid" : "Partial payment"}</Badge>
+                <span>
+                  Balance due: <b>{aed(round2(total - num(paidAmt)))}</b>
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
       <div className="actions">
-        <Button variant="success" icon="print" onClick={generate} disabled={busy}>
+        <Button variant="success" icon="print" onClick={generate} disabled={busy || !!payErr}>
           Generate &amp; print
         </Button>
         <Button variant="ghost" onClick={onCancel}>

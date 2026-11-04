@@ -6,6 +6,7 @@ import Button from "@/components/Button";
 import Card from "@/components/Card";
 import DataTable from "@/components/DataTable";
 import { Field, Input, PasswordInput, Select } from "@/components/Field";
+import Icon from "@/components/Icon";
 import LoadState from "@/components/LoadState";
 import PageHeader from "@/components/PageHeader";
 import { useUI } from "@/components/UIProvider";
@@ -17,6 +18,7 @@ import type { StaffType, User } from "@/types";
 import { initials } from "@/utils/Format";
 
 const EMPTY = { name: "", mobile: "", emp: "", user: "", pass: "", type: "" };
+const ASSIGNED: Record<string, string> = { Biller: "Assigned to UAE", Purchaser: "Assigned to India" };
 
 export default function StaffScreen() {
   const { toast, confirm } = useUI();
@@ -97,6 +99,12 @@ export default function StaffScreen() {
             </Field>
             <Field label="Employee type">
               <Select value={f.type} onChange={set("type")} options={[{ value: "", label: "Select…" }, "Admin", "Biller", "Purchaser"]} />
+              {ASSIGNED[f.type] && (
+                <div key={f.type} className="assign-note">
+                  <Icon name="globe" size={15} />
+                  {ASSIGNED[f.type]}
+                </div>
+              )}
             </Field>
           </div>
           <div className="actions">
