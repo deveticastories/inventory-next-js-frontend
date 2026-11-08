@@ -33,7 +33,7 @@ export default function CustomersScreen() {
 
   const save = () => {
     const c = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()])) as typeof EMPTY;
-    if (!c.name || !c.contact) return toast("Name and contact are required", "error");
+    if (Object.values(c).some((x) => !x)) return toast("Please fill all fields", "error");
     run(async () => {
       await createCustomer({ name: c.name, contactNo: c.contact, whatsAppNo: c.wa, address: c.addr, email: c.email });
       setF(EMPTY);

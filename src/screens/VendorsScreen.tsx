@@ -33,7 +33,7 @@ export default function VendorsScreen() {
 
   const save = () => {
     const v = Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x.trim()])) as typeof EMPTY;
-    if (!v.name || !v.contact) return toast("Vendor name and contact are required", "error");
+    if (Object.values(v).some((x) => !x)) return toast("Please fill all fields", "error");
     run(async () => {
       await createVendor({ vendorName: v.name, contactNo: v.contact, bankName: v.bank, accountNo: v.acc, ifsc: v.ifsc });
       setF(EMPTY);

@@ -16,27 +16,27 @@ import { useApi } from "@/hooks/useApi";
 import { setSettings } from "@/hooks/useSettings";
 import { useSubmit } from "@/hooks/useSubmit";
 import { getLatestPackingList, getTransitDetails, transferStylesToUae } from "@/services/PackingServices";
-import { getSettings, updateSettings } from "@/services/SettingsServices";
-import type { Settings, TransitDetails } from "@/types";
+import { updateSettings } from "@/services/SettingsServices";
+import type { TransitDetails } from "@/types";
 import { aed, inr, num } from "@/utils/Format";
 
 /** Transit works on the latest packing list. */
-async function loadTransit(): Promise<[Settings, TransitDetails | null]> {
-  const [settings, pk] = await Promise.all([getSettings(), getLatestPackingList()]);
-  return [settings, pk ? await getTransitDetails(pk._id) : null];
+async function loadTransit(): Promise<TransitDetails | null> {
+  const pk = await getLatestPackingList();
+  return pk ? await getTransitDetails(pk._id) : null;
 }
 
 export default function TransitScreen() {
   const q = useApi(loadTransit);
-  if (!q.data) return <LoadState error={q.error} onRetry={q.reload} />;
-  return <Transit key={`${q.data[0].exchangeRate}:${q.data[0].profitPercent}`} settings={q.data[0]} transit={q.data[1]} reload={q.reload} />;
+  if (q.data === undefined) return <LoadState error={q.error} onRetry={q.reload} />;
+  return <Transit transit={q.data} reload={q.reload} />;
 }
 
-function Transit({ settings, transit: c, reload }: { settings: Settings; transit: TransitDetails | null; reload: () => void }) {
+function Transit({ transit: c, reload }: { transit: TransitDetails | null; reload: () => void }) {
   const { toast, confirm } = useUI();
   const { busy, run } = useSubmit();
-  const [ex, setEx] = useState(String(settings.exchangeRate));
-  const [profit, setProfit] = useState(String(settings.profitPercent));
+  const [ex, setEx] = useState("0");
+  const [profit, setProfit] = useState("0");
   const [sel, setSel] = useState<string[]>([]);
 
   const saveRates = () => {
