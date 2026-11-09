@@ -7,19 +7,22 @@ import Combo from "@/components/Combo";
 import { Field, Input, Value } from "@/components/Field";
 import ListBlock, { useListFilter } from "@/components/ListBlock";
 import LoadState from "@/components/LoadState";
+import Modal from "@/components/Modal";
 import PageHeader from "@/components/PageHeader";
 import { useUI } from "@/components/UIProvider";
 import { useApi } from "@/hooks/useApi";
 import { useSubmit } from "@/hooks/useSubmit";
-import { createReceipt, getAllReceipts, getReceivableInvoices } from "@/services/ReceiptServices";
+import { createReceipt, getAllReceipts, getReceivableInvoices, updateReceipt } from "@/services/ReceiptServices";
+import type { ReceiptEntry } from "@/types";
 import { customerName } from "@/utils/Display";
-import { aed, BAL_EPS, fmtDate, nextCode, nf, num } from "@/utils/Format";
+import { aed, BAL_EPS, fmtDate, isoDay, nextCode, nf, num, today } from "@/utils/Format";
 import { printDoc } from "@/utils/Print";
 
 type Sort = "all" | "paid" | "out" | "cust";
 
 export default function ReceiptEntryScreen() {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ReceiptEntry | null>(null);
   const filter = useListFilter<Sort>("all");
   const q = useApi(
     () => getAllReceipts(filter.s === "paid" ? "paid" : filter.s === "out" ? "outstanding" : "all", filter.s === "cust" ? "customer" : "date"),
@@ -48,6 +51,7 @@ export default function ReceiptEntryScreen() {
         }
       />
       {open && <ReceiptForm nextNo={nextCode("REC-", (all.data ?? []).map((x) => x.receiptNo))} onSaved={reload} onClose={() => setOpen(false)} />}
+      {editing && <EditReceiptModal entry={editing} onClose={() => setEditing(null)} onSaved={reload} />}
       {!q.data ? (
         <LoadState error={q.error} onRetry={q.reload} />
       ) : (
@@ -62,7 +66,7 @@ export default function ReceiptEntryScreen() {
               ["cust", "Sort: Customer name"],
             ]}
             empty="No receipts yet"
-            head={["Receipt date", "Receipt no", "Invoice no", "Invoice date", "Customer name", "Receivable amount", "Received amount", "Balance amount"]}
+            head={["Paid date", "Receipt no", "Invoice no", "Invoice date", "Customer name", "Receivable amount", "Received amount", "Balance amount", "Action"]}
             rowKeys={q.data.map((x) => x._id)}
             rows={q.data.map((x) => [
               fmtDate(x.receiptDate ?? x.createdAt),
@@ -73,6 +77,9 @@ export default function ReceiptEntryScreen() {
               aed(x.receivableAmount),
               <span key="d" className="amount ok">{aed(x.receivedAmount)}</span>,
               <span key="b" className="amount">{aed(x.balanceAmount)}</span>,
+              <Button key="e" size="sm" variant="ghost" onClick={() => setEditing(x)}>
+                Edit
+              </Button>,
             ])}
           />
         </Card>
@@ -89,6 +96,7 @@ function ReceiptForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
   const q = useApi(getReceivableInvoices);
   const [inv, setInv] = useState("");
   const [amount, setAmount] = useState("");
+  const [paidDate, setPaidDate] = useState(today);
   const [last, setLast] = useState<Slip | null>(null);
   const b = q.data?.find((x) => x._id === inv);
   const due = b?.balanceAmount ?? 0;
@@ -97,11 +105,12 @@ function ReceiptForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
     const a = num(amount);
     if (!b) return toast("Select an invoice", "error");
     if (a <= 0 || a > due + 0.01) return toast(`Received amount must be 0 – ${nf(due)}`, "error");
+    if (!paidDate) return toast("Pick the paid date", "error");
     run(async () => {
-      const x = await createReceipt({ invoice: b._id, receivedAmount: a });
+      const x = await createReceipt({ invoice: b._id, receivedAmount: a, receiptDate: paidDate });
       setLast({
         no: x.receiptNo,
-        date: x.receiptDate ?? x.createdAt ?? "",
+        date: x.receiptDate ?? paidDate,
         inv: b.invoiceNo,
         cust: customerName(b.customer),
         recv: x.receivableAmount,
@@ -151,6 +160,9 @@ function ReceiptForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
         <Field label="Receivable amount">
           <Value strong>{b ? aed(due) : "—"}</Value>
         </Field>
+        <Field label="Paid date">
+          <Input type="date" max={today()} value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
+        </Field>
         <Field label="Received amount (AED)">
           <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </Field>
@@ -172,5 +184,58 @@ function ReceiptForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
         </Button>
       </div>
     </Card>
+  );
+}
+
+function EditReceiptModal({ entry, onClose, onSaved }: { entry: ReceiptEntry; onClose: () => void; onSaved: () => void }) {
+  const { toast } = useUI();
+  const { busy, run } = useSubmit();
+  const origDate = isoDay(entry.receiptDate ?? entry.createdAt);
+  const [paidDate, setPaidDate] = useState(origDate);
+  const [amount, setAmount] = useState(String(entry.receivedAmount));
+  // this receipt's amount can grow by whatever is still unpaid on the invoice
+  const max = entry.receivedAmount + (entry.invoice?.balanceAmount ?? 0);
+
+  const save = () => {
+    const a = num(amount);
+    if (!paidDate) return toast("Pick the paid date", "error");
+    if (a <= 0 || a > max + 0.01) return toast(`Received amount must be 0 – ${nf(max)}`, "error");
+    const input: { receivedAmount?: number; receiptDate?: string } = {};
+    if (Math.abs(a - entry.receivedAmount) > BAL_EPS) input.receivedAmount = a;
+    if (paidDate !== origDate) input.receiptDate = paidDate;
+    if (!Object.keys(input).length) return onClose();
+    run(async () => {
+      await updateReceipt(entry._id, input);
+      toast(`Receipt updated — ${entry.receiptNo}`);
+      onSaved();
+      onClose();
+    });
+  };
+
+  return (
+    <Modal
+      title={`Edit receipt ${entry.receiptNo}`}
+      subtitle={`${entry.invoice?.invoiceNo ?? "—"} · ${customerName(entry.invoice?.customer)}`}
+      onClose={() => !busy && onClose()}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="success" icon="check" onClick={save} loading={busy}>
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      <div className="grid">
+        <Field label="Paid date">
+          <Input type="date" max={today()} value={paidDate} disabled={busy} onChange={(e) => setPaidDate(e.target.value)} />
+        </Field>
+        <Field label="Received amount (AED)" hint={`Up to ${aed(max)}`}>
+          <Input type="number" min={0} step="0.01" value={amount} disabled={busy} onChange={(e) => setAmount(e.target.value)} />
+        </Field>
+      </div>
+    </Modal>
   );
 }

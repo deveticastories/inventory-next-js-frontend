@@ -12,7 +12,6 @@ import Notice from "@/components/Notice";
 import PageHeader from "@/components/PageHeader";
 import { useUI } from "@/components/UIProvider";
 import { useApi } from "@/hooks/useApi";
-import { useSession } from "@/hooks/useSession";
 import { useSubmit } from "@/hooks/useSubmit";
 import { getAllPurchaseEntries } from "@/services/PurchaseServices";
 import { getQualityCheckByPurchase, submitQualityCheck } from "@/services/QualityCheckServices";
@@ -23,12 +22,12 @@ import { num } from "@/utils/Format";
 export default function QualityCheckScreen() {
   const { toast, confirm } = useUI();
   const { busy, run } = useSubmit();
-  const me = useSession()?.user;
   const q = useApi(getAllPurchaseEntries);
   const [inv, setInv] = useState("");
   const [damage, setDamage] = useState<Record<string, string>>({});
   // rows are confirmed one by one here, then sent to the server together
   const [locked, setLocked] = useState<string[]>([]);
+  const [checkedByName, setCheckedByName] = useState("");
 
   const p = q.data?.find((x) => x._id === inv);
   const done = p?.qcStatus === "Done";
@@ -42,6 +41,7 @@ export default function QualityCheckScreen() {
     setInv(v);
     setDamage({});
     setLocked([]);
+    setCheckedByName("");
   };
 
   const damageOf = (id: string) => {
@@ -66,11 +66,14 @@ export default function QualityCheckScreen() {
 
   const final = () => {
     if (p!.products.some((i) => !locked.includes(i._id))) return toast("Submit every product row first", "error");
+    const by = checkedByName.trim();
+    if (!by) return toast('Enter "Checked by"', "error");
     confirm("Complete quality check? Stock and vendor payable will be updated.", () =>
       run(async () => {
         await submitQualityCheck({
           purchaseEntry: p!._id,
           products: p!.products.map((i) => ({ purchaseEntryProduct: i._id, damageQty: damageOf(i._id) })),
+          checkedByName: by,
         });
         toast("QC completed — payable posted to vendor history");
         q.reload();
@@ -79,7 +82,7 @@ export default function QualityCheckScreen() {
   };
 
   const lockedCount = done ? (p?.products.length ?? 0) : locked.length;
-  const checkedBy = done ? staffName(qcData?.checkedBy) : (me?.staffName ?? "");
+  const checkedBy = done ? qcData?.checkedByName || staffName(qcData?.checkedBy) : checkedByName;
 
   return (
     <>
@@ -135,8 +138,13 @@ export default function QualityCheckScreen() {
             })}
           />
           <div className="actions">
-            <Field label="Checked by" style={{ width: 300 }} hint={done ? undefined : "Recorded as the signed-in staff member"}>
-              <Input value={checkedBy} disabled readOnly />
+            <Field label="Checked by" style={{ width: 300 }}>
+              <Input
+                value={checkedBy}
+                disabled={done}
+                placeholder="Name of the person who checked"
+                onChange={(e) => setCheckedByName(e.target.value)}
+              />
             </Field>
             <Button variant="success" icon="shield" disabled={done || busy} onClick={final} style={{ alignSelf: "flex-end" }}>
               Submit quality check

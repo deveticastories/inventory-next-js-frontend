@@ -160,6 +160,8 @@ export interface QualityCheck {
     totalIncludingGST: number;
   };
   checkedBy: { _id: string; staffName?: string; employeeId?: string; email?: string } | null;
+  /** Name typed in at submit; older records only have `checkedBy`. */
+  checkedByName?: string;
   checkedAt: string;
   summary: {
     totalApprovedQty: number;

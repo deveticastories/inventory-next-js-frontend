@@ -7,22 +7,25 @@ import Combo from "@/components/Combo";
 import { Field, Input, Value } from "@/components/Field";
 import ListBlock, { useListFilter } from "@/components/ListBlock";
 import LoadState from "@/components/LoadState";
+import Modal from "@/components/Modal";
 import PageHeader from "@/components/PageHeader";
 import { useUI } from "@/components/UIProvider";
 import { useApi } from "@/hooks/useApi";
 import { useSubmit } from "@/hooks/useSubmit";
-import { createPayment, getAllPayments, getPayableInvoices } from "@/services/PaymentServices";
+import { createPayment, getAllPayments, getPayableInvoices, updatePayment } from "@/services/PaymentServices";
 import type { PaymentEntry } from "@/types";
 import { vendorName } from "@/utils/Display";
-import { BAL_EPS, fmtDate, inr, nextCode, nf, num } from "@/utils/Format";
+import { BAL_EPS, fmtDate, inr, isoDay, nextCode, nf, num, today } from "@/utils/Format";
 import { printDoc } from "@/utils/Print";
 
 type Sort = "all" | "paid" | "out" | "vendor";
 
 const invoiceOf = (x: PaymentEntry) => (typeof x.purchaseInvoice === "object" ? x.purchaseInvoice : null);
+const invoiceIdOf = (x: PaymentEntry) => (typeof x.purchaseInvoice === "object" ? x.purchaseInvoice?._id : x.purchaseInvoice);
 
 export default function PaymentEntryScreen() {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<PaymentEntry | null>(null);
   const filter = useListFilter<Sort>("all");
   const q = useApi(
     () => getAllPayments(filter.s === "paid" ? "paid" : filter.s === "out" ? "outstanding" : "all", filter.s === "vendor" ? "vendor" : "date"),
@@ -51,6 +54,7 @@ export default function PaymentEntryScreen() {
         }
       />
       {open && <PaymentForm nextNo={nextCode("PAY-", (all.data ?? []).map((x) => x.paymentVoucherNo))} onSaved={reload} onClose={() => setOpen(false)} />}
+      {editing && <EditPaymentModal entry={editing} all={all.data ?? []} onClose={() => setEditing(null)} onSaved={reload} />}
       {!q.data ? (
         <LoadState error={q.error} onRetry={q.reload} />
       ) : (
@@ -64,7 +68,7 @@ export default function PaymentEntryScreen() {
               ["out", "Outstanding purchase invoices"],
               ["vendor", "Sort: Vendor name"],
             ]}
-            head={["Paid date", "Voucher no", "Purchase invoice no", "Purchase invoice date", "Vendor name", "Payable amount", "Paid amount", "Balance amount"]}
+            head={["Paid date", "Voucher no", "Purchase invoice no", "Purchase invoice date", "Vendor name", "Payable amount", "Paid amount", "Balance amount", "Action"]}
             rowKeys={q.data.map((x) => x._id)}
             rows={q.data.map((x) => {
               const inv = invoiceOf(x);
@@ -77,6 +81,9 @@ export default function PaymentEntryScreen() {
                 inr(x.payableAmount),
                 <span key="p" className="amount ok">{inr(x.paidAmount)}</span>,
                 <span key="b" className="amount">{inr(x.balanceAmount)}</span>,
+                <Button key="e" size="sm" variant="ghost" onClick={() => setEditing(x)}>
+                  Edit
+                </Button>,
               ];
             })}
           />
@@ -94,6 +101,7 @@ function PaymentForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
   const q = useApi(getPayableInvoices);
   const [inv, setInv] = useState("");
   const [amount, setAmount] = useState("");
+  const [paidDate, setPaidDate] = useState(today);
   const [last, setLast] = useState<Voucher | null>(null);
   const p = q.data?.find((x) => x._id === inv);
   const due = p?.balanceAmount ?? 0;
@@ -102,11 +110,12 @@ function PaymentForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
     const a = num(amount);
     if (!p) return toast("Select an invoice", "error");
     if (a <= 0 || a > due + 0.01) return toast(`Paid amount must be 0 – ${nf(due)}`, "error");
+    if (!paidDate) return toast("Pick the paid date", "error");
     run(async () => {
-      const x = await createPayment({ purchaseInvoice: p._id, paidAmount: a });
+      const x = await createPayment({ purchaseInvoice: p._id, paidAmount: a, paymentDate: paidDate });
       setLast({
         no: x.paymentVoucherNo,
-        date: x.paymentDate ?? x.createdAt ?? "",
+        date: x.paymentDate ?? paidDate,
         inv: p.invoiceNo,
         vendor: vendorName(p.vendor),
         payable: x.payableAmount,
@@ -156,6 +165,9 @@ function PaymentForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
         <Field label="Payable amount">
           <Value strong>{p ? inr(due) : "—"}</Value>
         </Field>
+        <Field label="Paid date">
+          <Input type="date" max={today()} value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
+        </Field>
         <Field label="Paid amount (₹)">
           <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </Field>
@@ -177,5 +189,61 @@ function PaymentForm({ nextNo, onSaved, onClose }: { nextNo: string; onSaved: ()
         </Button>
       </div>
     </Card>
+  );
+}
+
+function EditPaymentModal({ entry, all, onClose, onSaved }: { entry: PaymentEntry; all: PaymentEntry[]; onClose: () => void; onSaved: () => void }) {
+  const { toast } = useUI();
+  const { busy, run } = useSubmit();
+  const [paidDate, setPaidDate] = useState(isoDay(entry.paymentDate ?? entry.createdAt));
+  const [amount, setAmount] = useState(String(entry.paidAmount));
+  const inv = invoiceOf(entry);
+
+  // this voucher's amount can grow by whatever is still unpaid on the invoice (latest voucher's balance)
+  const vouchers = all.filter((v) => invoiceIdOf(v) === invoiceIdOf(entry));
+  const latest = vouchers.reduce<PaymentEntry>((a, v) => ((v.createdAt ?? "") > (a.createdAt ?? "") ? v : a), entry);
+  const max = entry.paidAmount + latest.balanceAmount;
+
+  const save = () => {
+    const a = num(amount);
+    if (!paidDate) return toast("Pick the paid date", "error");
+    if (a <= 0 || a > max + 0.01) return toast(`Paid amount must be 0 – ${nf(max)}`, "error");
+    const input: { paidAmount?: number; paymentDate?: string } = {};
+    if (Math.abs(a - entry.paidAmount) > BAL_EPS) input.paidAmount = a;
+    if (paidDate !== isoDay(entry.paymentDate ?? entry.createdAt)) input.paymentDate = paidDate;
+    if (!Object.keys(input).length) return onClose();
+    run(async () => {
+      await updatePayment(entry._id, input);
+      toast(`Payment updated — ${entry.paymentVoucherNo}`);
+      onSaved();
+      onClose();
+    });
+  };
+
+  return (
+    <Modal
+      title={`Edit payment ${entry.paymentVoucherNo}`}
+      subtitle={`${inv?.invoiceNo ?? "—"} · ${vendorName(inv?.vendor)}`}
+      onClose={() => !busy && onClose()}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button variant="success" icon="check" onClick={save} loading={busy}>
+            {busy ? "Saving…" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      <div className="grid">
+        <Field label="Paid date">
+          <Input type="date" max={today()} value={paidDate} disabled={busy} onChange={(e) => setPaidDate(e.target.value)} />
+        </Field>
+        <Field label="Paid amount (₹)" hint={`Up to ${inr(max)}`}>
+          <Input type="number" min={0} step="0.01" value={amount} disabled={busy} onChange={(e) => setAmount(e.target.value)} />
+        </Field>
+      </div>
+    </Modal>
   );
 }

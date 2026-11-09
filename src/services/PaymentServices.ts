@@ -10,7 +10,11 @@ export const getAllPayments = (status: PaymentFilter = "all", sortBy: "date" | "
 /** QC-approved purchase invoices that still have a balance. */
 export const getPayableInvoices = () => getData<PayableInvoice[]>(ENDPOINTS.paymentEntries.payableInvoices);
 
-export const createPayment = async (input: { purchaseInvoice: string; paidAmount: number }) =>
+export const createPayment = async (input: { purchaseInvoice: string; paidAmount: number; paymentDate: string }) =>
   (await api.post<{ data: PaymentEntry }>(ENDPOINTS.paymentEntries.root, input)).data;
+
+/** Only paid amount and paid date can change; balances on the invoice are recalculated. */
+export const updatePayment = async (id: string, input: { paidAmount?: number; paymentDate?: string }) =>
+  (await api.put<{ data: PaymentEntry }>(ENDPOINTS.paymentEntries.byId(id), input)).data;
 
 export const deletePayment = (id: string) => api.delete(ENDPOINTS.paymentEntries.byId(id));

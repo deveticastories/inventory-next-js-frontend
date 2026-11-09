@@ -23,6 +23,7 @@ input,select,textarea{font:inherit}
 @keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes flowLine{from{background-position:0 0}to{background-position:24px 0}}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
 
 .view>*{animation:fadeUp var(--m-slow) var(--m-ease) both}
 .view>*:nth-child(2){animation-delay:60ms}
@@ -38,6 +39,8 @@ input,select,textarea{font:inherit}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;transition-duration:.01ms!important}
+  /* a frozen spinner reads as "stuck", so keep it turning, just slower */
+  .spinner{animation-duration:1.6s!important}
 }
 
 /* ================= shell ================= */
@@ -209,6 +212,10 @@ input[type="checkbox"]:disabled{cursor:not-allowed;opacity:.45}
 .btn-soft{background:var(--c-primary-soft);color:var(--c-primary)}
 .btn:disabled{background:#E3E7F0;color:#9AA3B8;border-color:transparent;box-shadow:none;cursor:not-allowed}
 .btn:disabled::after{display:none}
+/* busy keeps the variant colours (unlike :disabled) and blocks repeat clicks */
+.btn.is-loading{cursor:progress;pointer-events:none}
+.btn.is-loading::after{display:none}
+.spinner{flex:none;border-radius:50%;border:2.4px solid currentColor;border-right-color:transparent;opacity:.9;animation:spin .7s linear infinite}
 .icon-btn{width:36px;height:36px;border:0;background:none;border-radius:10px;display:grid;place-items:center;cursor:pointer;color:var(--c-muted);transition:background var(--m-fast),color var(--m-fast),transform var(--m-base) var(--m-ease)}
 .icon-btn:hover{background:var(--c-primary-soft);color:var(--c-primary);transform:rotate(90deg)}
 .menu-btn:hover{transform:none}
