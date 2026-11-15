@@ -47,7 +47,12 @@ export default function Combo({
           setOpen(true);
         }}
         onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
+          // Close only the list; keep a surrounding Modal open.
+          if (e.key === "Escape" && open) {
+            e.preventDefault();
+            e.nativeEvent.stopImmediatePropagation();
+            setOpen(false);
+          }
           if (e.key === "Enter" && list[0]) {
             onChange(list[0].value);
             setOpen(false);

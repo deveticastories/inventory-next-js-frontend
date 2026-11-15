@@ -15,6 +15,7 @@ import { useSubmit } from "@/hooks/useSubmit";
 import { getAllExpenses } from "@/services/ExpenseServices";
 import { createPackingList, getAllPackingLists, getPackableProducts, getPackableVendors } from "@/services/PackingServices";
 import type { PackingList, PackingVendorAvailability } from "@/types";
+import { downloadExcel } from "@/utils/Excel";
 import { fmtDate, inr, nextCode, num, sum, today } from "@/utils/Format";
 
 type Staged = { style: string; product: string; vendor: string; vendorName: string; qty: number };
@@ -93,6 +94,20 @@ function PackingForm({ lists, onCancel, onCreated }: { lists: PackingList[]; onC
   const stock = vendors.find((v) => v.vendor._id === ven);
   const avail = prod && stock ? stock.availableQty - staged(prod, ven) : null;
   const usedStyles = new Set(lists.flatMap((p) => p.styles.map((s) => s.styleNo)));
+  const packingId = nextCode("PK-", lists.map((l) => l.packingId));
+
+  const exportExcel = () => {
+    if (!lines.length) return toast("Add at least one style", "error");
+    downloadExcel(
+      `${packingId}-styles`,
+      packingId,
+      ["Packing ID", "Date", "Style no", "Product", "Vendor", "Qty"],
+      [
+        ...lines.map((l) => [packingId, fmtDate(date), l.style, l.product, l.vendorName, l.qty]),
+        ["", "", "", "", "Total", sum(lines, (l) => l.qty)],
+      ],
+    );
+  };
 
   const add = () => {
     const st = style.trim(), q = num(qty);
@@ -124,7 +139,7 @@ function PackingForm({ lists, onCancel, onCreated }: { lists: PackingList[]; onC
       <Card title="New packing list" icon="package">
         <div className="grid">
           <Field label="Packing ID (auto)">
-            <Input readOnly value={nextCode("PK-", lists.map((l) => l.packingId))} />
+            <Input readOnly value={packingId} />
           </Field>
           <Field label="Packing date">
             <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -162,7 +177,15 @@ function PackingForm({ lists, onCancel, onCreated }: { lists: PackingList[]; onC
         />
       </Card>
 
-      <Card title="Add styles" icon="layers">
+      <Card
+        title="Add styles"
+        icon="layers"
+        action={
+          <Button variant="ghost" size="sm" icon="download" onClick={exportExcel} disabled={!lines.length}>
+            Download Excel
+          </Button>
+        }
+      >
         <div className="row">
           <Field label="Style no">
             <Input value={style} onChange={(e) => setStyle(e.target.value)} placeholder="e.g. ST-201" />

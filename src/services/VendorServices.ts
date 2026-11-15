@@ -4,7 +4,7 @@ import { api, getAllPages, getData } from "./ApiClient";
 
 export interface CreateVendorInput {
   vendorName: string;
-  contactNo: string;
+  contactNo?: string;
   bankName?: string;
   accountNo?: string;
   ifsc?: string;

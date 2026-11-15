@@ -33,8 +33,9 @@ export default function CustomersScreen() {
 
   const save = () => {
     const c = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()])) as typeof EMPTY;
-    if (Object.values(c).some((x) => !x)) return toast("Please fill all fields", "error");
+    if (!c.name) return toast("Name is required", "error");
     run(async () => {
+      // Only name is mandatory; the API still expects the other fields as (possibly empty) strings.
       await createCustomer({ name: c.name, contactNo: c.contact, whatsAppNo: c.wa, address: c.addr, email: c.email });
       setF(EMPTY);
       setCreating(false);
@@ -60,7 +61,7 @@ export default function CustomersScreen() {
       {creating && (
         <Card title="New customer" icon="contact">
           <div className="grid">
-            <Field label="Name">
+            <Field label="Name *">
               <Input value={f.name} onChange={set("name")} />
             </Field>
             <Field label="Contact no">
@@ -98,8 +99,8 @@ export default function CustomersScreen() {
                 <span className="avatar">{initials(c.name)}</span>
                 {c.name}
               </button>,
-              c.contactNo,
-              c.email,
+              c.contactNo || "—",
+              c.email || "—",
               <span key="o" className={`amount ${out > BAL_EPS ? "bad" : "ok"}`}>
                 {aed(out)}
               </span>,
@@ -134,7 +135,7 @@ function CustomerDetail({ id, onBack }: { id: string; onBack: () => void }) {
 
   return (
     <>
-      <PageHeader eyebrow="Customer" title={c.name} subtitle={`${c.contactNo} · ${c.email} · ${c.address}`} actions={back} />
+      <PageHeader eyebrow="Customer" title={c.name} subtitle={[c.contactNo, c.email, c.address].filter(Boolean).join(" · ") || undefined} actions={back} />
       <StatGrid>
         <StatCard label="Outstanding amount" value={outstandingAmount} format={aed} icon="rupee" tone="danger" />
         <StatCard label="Invoices" value={all.data?.length ?? "—"} icon="receipt" tone="primary" />

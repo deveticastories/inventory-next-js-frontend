@@ -33,8 +33,9 @@ export default function VendorsScreen() {
 
   const save = () => {
     const v = Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x.trim()])) as typeof EMPTY;
-    if (Object.values(v).some((x) => !x)) return toast("Please fill all fields", "error");
+    if (!v.name) return toast("Vendor name is required", "error");
     run(async () => {
+      // Only vendor name is mandatory; the API still expects the other fields as (possibly empty) strings.
       await createVendor({ vendorName: v.name, contactNo: v.contact, bankName: v.bank, accountNo: v.acc, ifsc: v.ifsc });
       setF(EMPTY);
       setCreating(false);
@@ -60,7 +61,7 @@ export default function VendorsScreen() {
       {creating && (
         <Card title="Add vendor" icon="plus">
           <div className="grid">
-            <Field label="Vendor name">
+            <Field label="Vendor name *">
               <Input value={f.name} onChange={set("name")} />
             </Field>
             <Field label="Contact no">
@@ -98,8 +99,8 @@ export default function VendorsScreen() {
                 <span className="avatar">{initials(v.vendorName)}</span>
                 {v.vendorName}
               </button>,
-              v.contactNo,
-              `${v.bankName} · ${v.accountNo}`,
+              v.contactNo || "—",
+              `${v.bankName || "—"} · ${v.accountNo || "—"}`,
               <span key="o" className={`amount ${out > BAL_EPS ? "bad" : "ok"}`}>
                 {inr(out)}
               </span>,
@@ -132,7 +133,7 @@ function VendorDetail({ id, onBack }: { id: string; onBack: () => void }) {
       <PageHeader eyebrow="Vendor" title={v.vendorName} subtitle="Vendor details & payment history" actions={back} />
       <Card>
         <div className="info-grid">
-          <InfoItem icon="phone" label="Contact" value={v.contactNo} />
+          <InfoItem icon="phone" label="Contact" value={v.contactNo || "—"} />
           <InfoItem icon="bank" label="Bank" value={v.bankName || "—"} />
           <InfoItem icon="file" label="Account no / IFSC" value={`${v.accountNo || "—"} · ${v.ifsc || "—"}`} />
           <div className="info-item">

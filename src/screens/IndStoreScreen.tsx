@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import Button from "@/components/Button";
 import Card from "@/components/Card";
@@ -133,14 +134,18 @@ function TransferSampleModal({ lines, onClose, onDone }: { lines: MainStockLine[
   const [item, setItem] = useState("");
   const [qty, setQty] = useState("");
   const l = lines.find((x) => x.qualityCheckProduct === item);
+  // Resolve the two store ids up front so a missing store is shown before the user fills the form.
+  const stores = useApi(getIndStores);
+  const missing = stores.data && [!stores.data.main && "TRP_MAIN STORE", !stores.data.sample && "TRP_SAMPLE STORE"].filter(Boolean);
+  const ready = !!stores.data?.main && !!stores.data?.sample;
 
   const submit = () => {
     const q = num(qty);
     if (!l) return toast("Select a product", "error");
     if (q <= 0 || q > l.availableQty || !Number.isInteger(q)) return toast(`Qty must be 1 – ${l.availableQty}`, "error");
+    const { main, sample } = stores.data ?? {};
+    if (!main || !sample) return toast("Create TRP_MAIN STORE and TRP_SAMPLE STORE (location IND) in Stores first", "error");
     run(async () => {
-      const { main, sample } = await getIndStores();
-      if (!main || !sample) throw new Error("Create TRP_MAIN STORE and TRP_SAMPLE STORE (location IND) in Stores first");
       await transferStock({ fromStore: main._id, toStore: sample._id, products: [{ qualityCheckProduct: l.qualityCheckProduct, qty: q }] });
       toast("Transferred to TRP_SAMPLE STORE");
       onDone();
@@ -158,14 +163,28 @@ function TransferSampleModal({ lines, onClose, onDone }: { lines: MainStockLine[
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button icon="swap" onClick={submit} disabled={busy}>
+          <Button icon="swap" onClick={submit} disabled={busy || !ready}>
             Transfer
           </Button>
         </>
       }
     >
+      {stores.error && (
+        <Notice tone="warn">
+          Could not load stores: {stores.error}{" "}
+          <button className="link" onClick={stores.reload}>
+            Retry
+          </button>
+        </Notice>
+      )}
+      {missing && missing.length > 0 && (
+        <Notice tone="warn">
+          {missing.join(" and ")} not found. Create {missing.length > 1 ? "them" : "it"} in <Link href="/stores" className="link">Stores</Link>{" "}
+          with location <b>IND</b> (the name must contain &quot;MAIN&quot; / &quot;SAMPLE&quot;), then try again.
+        </Notice>
+      )}
       <div className="grid">
-        <Field label="Product">
+        <Field label="Product" style={{ gridColumn: "1 / -1" }}>
           <Combo
             options={lines
               .filter((x) => x.availableQty > 0)
