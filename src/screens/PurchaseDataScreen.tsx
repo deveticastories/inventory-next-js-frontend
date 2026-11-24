@@ -12,6 +12,7 @@ import PageSkeleton from "@/components/PageSkeleton";
 import StatCard, { StatGrid } from "@/components/StatCard";
 import { useApi } from "@/hooks/useApi";
 import { getAllPurchaseEntries } from "@/services/PurchaseServices";
+import { getPurchaseReportTotals } from "@/services/ReportServices";
 import { getQualityCheckByPurchase } from "@/services/QualityCheckServices";
 import type { QualityCheck } from "@/types";
 import { purchaseOptions, vendorName } from "@/utils/Display";
@@ -19,6 +20,7 @@ import { inr } from "@/utils/Format";
 
 export default function PurchaseDataScreen() {
   const q = useApi(getAllPurchaseEntries);
+  const totals = useApi(getPurchaseReportTotals);
   const [inv, setInv] = useState("");
   const p = q.data?.find((x) => x._id === inv);
   const done = p?.qcStatus === "Done";
@@ -30,6 +32,15 @@ export default function PurchaseDataScreen() {
   return (
     <>
       <PageHeader eyebrow="Purchase" title="Purchase Data" subtitle="Approved vs damaged items and payable amount after QC" />
+      {totals.data && (
+        <StatGrid>
+          <StatCard label="Total purchase qty" value={totals.data.totalProductQtyBeforeQualityCheck} icon="box" tone="info" />
+          <StatCard label="Total damage qty" value={totals.data.totalDamagedQty} icon="alert" tone="danger" />
+          <StatCard label="Total amount" value={totals.data.totalIncludingGSTBeforeQualityCheck} format={inr} icon="rupee" tone="primary" />
+          <StatCard label="Total paid amount" value={totals.data.totalPaidAmount} format={inr} icon="wallet" tone="success" />
+          <StatCard label="Total balance" value={totals.data.totalBalanceAmount} format={inr} icon="clock" tone="warning" />
+        </StatGrid>
+      )}
       <Card title="Select invoice" icon="search">
         <Field label="Invoice no" style={{ maxWidth: 460 }}>
           <Combo options={purchaseOptions(q.data)} value={inv} onChange={setInv} placeholder="Search invoice…" />

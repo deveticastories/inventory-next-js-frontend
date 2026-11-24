@@ -19,14 +19,14 @@ const REPORTS: Record<string, Report> = {
     title: "Purchase report",
     tab: "Purchase",
     load: async () => ({
-      head: ["Invoice", "Date", "Vendor", "Qty", "Amount", "Incl. GST", "QC", "Payable", "Paid", "Balance"],
+      head: ["Invoice", "Date", "Vendor", "Qty", "Amount", "Incl. GST", "QC", "Damaged Qty", "Payable", "Paid", "Balance"],
       rows: (await R.getPurchaseReport()).map((p) => {
         const qc = p.qcStatus === "Done" && p.qualityCheck;
         const payable = qc ? p.qualityCheck!.payableAfterQC : 0;
         const paid = sum(p.payments ?? [], (x) => x.paidAmount);
         return [
           p.invoiceNo, fmtDate(p.purchaseDate), vendorName(p.vendor), p.totalProductQty, inr(p.totalAmount), inr(p.totalIncludingGST),
-          p.qcStatus, qc ? inr(payable) : "—", inr(paid), qc ? inr(payable - paid) : "—",
+          p.qcStatus, qc ? p.qualityCheck!.totalDamagedQty : "—", qc ? inr(payable) : "—", inr(paid), qc ? inr(payable - paid) : "—",
         ];
       }),
     }),

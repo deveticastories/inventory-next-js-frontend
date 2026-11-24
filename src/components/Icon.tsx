@@ -24,6 +24,7 @@ const PATHS = {
   plus: "M12 5v14M5 12h14",
   x: "M18 6L6 18M6 6l12 12",
   check: "M20 6L9 17l-5-5",
+  edit: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z",
   arrowLeft: "M19 12H5M12 19l-7-7 7-7",
   arrowRight: "M5 12h14M12 5l7 7-7 7",
   swap: "M16 3l4 4-4 4M20 7H4M8 21l-4-4 4-4M4 17h16",

@@ -3,8 +3,8 @@
  * The browser calls `BASE_URL` on the same origin; the rewrite in `next.config.ts`
  * forwards `/api/*` to `BACKEND_URL`, so the HTTPS site never makes an HTTP request.
  */
-export const BACKEND_URL = "http://3.107.18.59:4005";
-// export const BACKEND_URL = "http://localhost:3001";
+// export const BACKEND_URL = "http://3.107.18.59:4005";
+export const BACKEND_URL = "http://localhost:3001";
 export const BASE_URL = "/api";
 
 /** Backend caps `limit` at 100 per page. */
@@ -60,6 +60,10 @@ export const ENDPOINTS = {
     root: "/daily-expenses",
     byId: (id: string) => `/daily-expenses/${id}`,
     packing: (id: string) => `/daily-expenses/${id}/packing`,
+  },
+  creditNotes: {
+    root: "/credit-notes",
+    byId: (id: string) => `/credit-notes/${id}`,
   },
   packingLists: {
     root: "/packing-lists",

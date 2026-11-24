@@ -201,6 +201,16 @@ export interface DailyExpense {
   description?: string;
   /** "Open" until attached to a packing list, then the packing ID. */
   packingId: string;
+  /** The backend books an expense into a month by this, not by `date`. */
+  createdAt?: string;
+}
+
+/** A fund added to the petty cash (the backend's credit note). */
+export interface CreditNote {
+  _id: string;
+  amount: number;
+  description?: string;
+  createdAt: string;
 }
 
 /* ---------- packing / transit ---------- */
@@ -414,8 +424,21 @@ export interface Dashboard {
 
 export interface PurchaseReportRow extends Omit<PurchaseEntry, "vendor"> {
   vendor: Vendor | null;
-  qualityCheck: { payableAfterQC: number } | null;
+  qualityCheck: { payableAfterQC: number; totalDamagedQty: number } | null;
   payments: { paidAmount: number }[];
+}
+
+/** Grand totals the purchase-entry report returns alongside its rows. */
+export interface PurchaseReportTotals {
+  totalProductQtyBeforeQualityCheck: number;
+  totalAmountBeforeQualityCheck: number;
+  totalIncludingGSTBeforeQualityCheck: number;
+  totalApprovedQty: number;
+  totalDamagedQty: number;
+  availableQtyAfterQC: number;
+  payableAfterQC: number;
+  totalPaidAmount: number;
+  totalBalanceAmount: number;
 }
 
 export interface SalesReportRow extends Omit<Billing, "customer"> {
