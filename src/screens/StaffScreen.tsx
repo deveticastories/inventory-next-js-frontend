@@ -5,7 +5,7 @@ import Badge from "@/components/Badge";
 import Button from "@/components/Button";
 import Card from "@/components/Card";
 import DataTable from "@/components/DataTable";
-import { Field, Input, PasswordInput, Select } from "@/components/Field";
+import { Field, Input, PasswordInput, Select, Value } from "@/components/Field";
 import Icon from "@/components/Icon";
 import LoadState from "@/components/LoadState";
 import PageHeader from "@/components/PageHeader";
@@ -16,8 +16,16 @@ import { useSubmit } from "@/hooks/useSubmit";
 import { createStaff, deleteStaff, getAllStaff } from "@/services/StaffServices";
 import type { StaffType, User } from "@/types";
 import { initials } from "@/utils/Format";
+import { emailError, NAME_INVALID_CHARS, nameError } from "@/utils/Validation";
 
-const EMPTY = { name: "", mobile: "", emp: "", user: "", pass: "", type: "" };
+const EMPTY = { name: "", mobile: "", user: "", pass: "", type: "" };
+const EMP_ID = /^EMP(\d+)$/;
+
+/** Next EMP### after the highest well-formed existing ID; malformed legacy IDs are ignored. */
+const nextEmployeeId = (staff: User[]) => {
+  const max = Math.max(0, ...staff.map((s) => Number(EMP_ID.exec(s.employeeId)?.[1] ?? 0)));
+  return "EMP" + String(max + 1).padStart(3, "0");
+};
 const ASSIGNED: Record<string, string> = { Biller: "Assigned to UAE", Purchaser: "Assigned to India" };
 
 export default function StaffScreen() {
@@ -28,25 +36,33 @@ export default function StaffScreen() {
   const [creating, setCreating] = useState(false);
   const [f, setF] = useState(EMPTY);
   const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
+  // Opening and closing both start from a blank form so cancelled input never resurfaces.
+  const openForm = (open: boolean) => {
+    setF(EMPTY);
+    setCreating(open);
+  };
 
   if (!q.data) return <LoadState error={q.error} onRetry={q.reload} />;
   const staff = q.data;
+  const empId = nextEmployeeId(staff);
+  const emailErr = f.user.trim() ? emailError(f.user) : null;
 
   const save = () => {
     const s = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()])) as typeof EMPTY;
     if (Object.values(s).some((x) => !x)) return toast("Fill all staff fields", "error");
-    if (staff.some((x) => x.employeeId === s.emp)) return toast("Employee ID already exists", "error");
+    const nameErr = nameError(s.name, "Staff name");
+    if (nameErr) return toast(nameErr, "error");
+    if (emailErr) return toast(emailErr, "error");
     run(async () => {
       await createStaff({
         staffName: s.name,
         mobileNumber: s.mobile,
-        employeeId: s.emp,
+        employeeId: empId,
         email: s.user,
         password: s.pass,
         employeeType: s.type as StaffType,
       });
-      setF(EMPTY);
-      setCreating(false);
+      openForm(false);
       toast("Staff created");
       q.reload();
     });
@@ -73,7 +89,7 @@ export default function StaffScreen() {
         subtitle="Create and manage staff logins"
         actions={
           !creating && (
-            <Button icon="plus" onClick={() => setCreating(true)}>
+            <Button icon="plus" onClick={() => openForm(true)}>
               Create staff
             </Button>
           )
@@ -83,19 +99,32 @@ export default function StaffScreen() {
         <Card title="Create staff" icon="plus">
           <div className="grid">
             <Field label="Staff name">
-              <Input value={f.name} onChange={set("name")} placeholder="Full name" />
+              <Input
+                value={f.name}
+                onChange={(e) => setF({ ...f, name: e.target.value.replace(NAME_INVALID_CHARS, "") })}
+                placeholder="Full name"
+              />
             </Field>
             <Field label="Staff mobile no">
               <Input value={f.mobile} onChange={set("mobile")} inputMode="tel" placeholder="10-digit mobile" />
             </Field>
-            <Field label="Employee ID">
-              <Input value={f.emp} onChange={set("emp")} placeholder="EMP004" />
+            <Field label="Employee ID" hint="Auto-generated">
+              <Value>{empId}</Value>
             </Field>
             <Field label="Email / Username">
-              <Input value={f.user} onChange={set("user")} type="email" placeholder="name@stocklink.in" />
+              <Input
+                value={f.user}
+                onChange={set("user")}
+                type="email"
+                placeholder="name@stocklink.in"
+                autoComplete="off"
+                className={emailErr ? "input-error" : ""}
+                aria-invalid={!!emailErr}
+              />
+              {emailErr && <small className="field-error">{emailErr}</small>}
             </Field>
             <Field label="Password">
-              <PasswordInput value={f.pass} onChange={set("pass")} />
+              <PasswordInput value={f.pass} onChange={set("pass")} autoComplete="new-password" />
             </Field>
             <Field label="Employee type">
               <Select value={f.type} onChange={set("type")} options={[{ value: "", label: "Select…" }, "Admin", "Biller", "Purchaser"]} />
@@ -111,7 +140,7 @@ export default function StaffScreen() {
             <Button icon="check" onClick={save} disabled={busy}>
               Save
             </Button>
-            <Button variant="ghost" onClick={() => setCreating(false)}>
+            <Button variant="ghost" onClick={() => openForm(false)} disabled={busy}>
               Cancel
             </Button>
           </div>

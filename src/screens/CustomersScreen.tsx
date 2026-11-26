@@ -68,7 +68,7 @@ export default function CustomersScreen() {
               <Input value={f.contact} onChange={set("contact")} inputMode="tel" />
             </Field>
             <Field label="WhatsApp no">
-              <Input value={f.wa} onChange={set("wa")} inputMode="tel" placeholder="+971501112222" />
+              <Input value={f.wa} onChange={set("wa")} inputMode="tel" autoComplete="off" />
             </Field>
             <Field label="Address">
               <Input value={f.addr} onChange={set("addr")} />
@@ -81,7 +81,13 @@ export default function CustomersScreen() {
             <Button icon="check" onClick={save} disabled={busy}>
               Save
             </Button>
-            <Button variant="ghost" onClick={() => setCreating(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setF(EMPTY);
+                setCreating(false);
+              }}
+            >
               Cancel
             </Button>
           </div>

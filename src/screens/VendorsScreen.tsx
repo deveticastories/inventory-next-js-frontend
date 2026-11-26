@@ -15,6 +15,7 @@ import { useApi } from "@/hooks/useApi";
 import { useSubmit } from "@/hooks/useSubmit";
 import { createVendor, getAllVendors, getVendorDetails } from "@/services/VendorServices";
 import { BAL_EPS, fmtDate, initials, inr } from "@/utils/Format";
+import { NAME_INVALID_CHARS, nameError } from "@/utils/Validation";
 
 const EMPTY = { name: "", contact: "", bank: "", acc: "", ifsc: "" };
 
@@ -30,15 +31,20 @@ export default function VendorsScreen() {
   if (detail) return <VendorDetail id={detail} onBack={() => setDetail(null)} />;
   if (!q.data) return <LoadState error={q.error} onRetry={q.reload} />;
   const vendors = q.data;
+  const nameErr = f.name.trim() ? nameError(f.name, "Vendor name") : null;
+  const openForm = (open: boolean) => {
+    setF(EMPTY);
+    setCreating(open);
+  };
 
   const save = () => {
     const v = Object.fromEntries(Object.entries(f).map(([k, x]) => [k, x.trim()])) as typeof EMPTY;
-    if (!v.name) return toast("Vendor name is required", "error");
+    const err = nameError(v.name, "Vendor name");
+    if (err) return toast(err, "error");
     run(async () => {
       // Only vendor name is mandatory; the API still expects the other fields as (possibly empty) strings.
       await createVendor({ vendorName: v.name, contactNo: v.contact, bankName: v.bank, accountNo: v.acc, ifsc: v.ifsc });
-      setF(EMPTY);
-      setCreating(false);
+      openForm(false);
       toast("Vendor saved");
       q.reload();
     });
@@ -52,7 +58,7 @@ export default function VendorsScreen() {
         subtitle="Vendor master with outstanding balances"
         actions={
           !creating && (
-            <Button icon="plus" onClick={() => setCreating(true)}>
+            <Button icon="plus" onClick={() => openForm(true)}>
               Add vendor
             </Button>
           )
@@ -62,7 +68,13 @@ export default function VendorsScreen() {
         <Card title="Add vendor" icon="plus">
           <div className="grid">
             <Field label="Vendor name *">
-              <Input value={f.name} onChange={set("name")} />
+              <Input
+                value={f.name}
+                onChange={(e) => setF({ ...f, name: e.target.value.replace(NAME_INVALID_CHARS, "") })}
+                className={nameErr ? "input-error" : ""}
+                aria-invalid={!!nameErr}
+              />
+              {nameErr && <small className="field-error">{nameErr}</small>}
             </Field>
             <Field label="Contact no">
               <Input value={f.contact} onChange={set("contact")} inputMode="tel" />
@@ -81,7 +93,7 @@ export default function VendorsScreen() {
             <Button icon="check" onClick={save} disabled={busy}>
               Save vendor
             </Button>
-            <Button variant="ghost" onClick={() => setCreating(false)}>
+            <Button variant="ghost" onClick={() => openForm(false)} disabled={busy}>
               Cancel
             </Button>
           </div>
